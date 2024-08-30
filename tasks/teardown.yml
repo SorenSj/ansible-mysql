@@ -1,0 +1,41 @@
+---
+# Teardown tasks for the application. This will remove the application from the server.
+# This is useful for when you want to remove the application from the server.
+- name: Stop and disable mysqld
+  become: true
+  service:
+    name: mysqld
+    state: stopped
+    enabled: false
+
+- name: Remove MySQL server
+  become: true
+  apt:
+    name: "{{ item }}"
+    state: absent
+    purge: true
+    autoremove: true
+  with_items:
+    - mysql-server
+    - python-mysqldb
+
+- name: Remove MySQL client
+  become: true
+  apt:
+    name: mysql-client
+    state: absent
+    purge: true
+    autoremove: true
+
+- name: Remove MySQL configuration
+  become: true
+  file:
+    name: "{{ item }}"
+    state: absent
+  with_items:
+    - /etc/mysql/my.cnf
+    - /etc/mysql/conf.d/mysql.cnf
+    - /etc/mysql/conf.d/mysqld.cnf
+    - /etc/mysql/mysql.conf.d/mysqld
+    - /etc/mysql/mysql.conf.d/mysqld.cnf
+    - /etc/mysql/mysql.conf.d/mysqld_safe_syslog.cnf

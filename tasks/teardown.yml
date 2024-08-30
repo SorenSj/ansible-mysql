@@ -18,6 +18,7 @@
   with_items:
     - mysql-server
     - python-mysqldb
+  register: mysql_uninstalled
 
 - name: Remove MySQL client
   become: true
@@ -39,3 +40,4 @@
     - /etc/mysql/mysql.conf.d/mysqld
     - /etc/mysql/mysql.conf.d/mysqld.cnf
     - /etc/mysql/mysql.conf.d/mysqld_safe_syslog.cnf
+  when: mysql_uninstalled is changed

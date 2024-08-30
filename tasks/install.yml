@@ -1,0 +1,40 @@
+---
+- name: Check installed MySQL
+  command: bash -lc "mysql --version"
+  register: mysql_exists
+  changed_when: false
+  ignore_errors: true
+
+# Install MySQL server
+- name: Install MySQL server
+  become: true
+  apt:
+    name: "{{ item }}"
+    state: present
+    update_cache: true
+  with_items:
+    - mysql-server
+    - python-mysqldb
+  when: mysql_exists is failed
+
+# Install MySQL client
+- name: Install MySQL client
+  become: true
+  apt:
+    name: mysql-client
+    state: present
+    update_cache: true
+  when: mysql_install_client is true
+
+- name: Run and enable mysqld
+  become: true
+  service:
+    name: mysqld
+    state: started
+    enabled: true
+  when:
+    - mysql_exists is failed
+
+- name: Set root password
+  command: mysqladmin -u root password "{{ mysql_root_password }}"
+  when: mysql_exists is failed

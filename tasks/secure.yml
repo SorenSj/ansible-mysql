@@ -1,0 +1,72 @@
+---
+# Secure MySQL installation
+- name: Copy my.cnf config file
+  ansible.builtin.template:
+    src: my.cnf.j2
+    dest: /etc/mysql/my.cnf
+    mode: '644'
+  notify:
+    - Restart mysql service
+
+- name: Activate passwordless access for root user
+  ansible.builtin.template:
+    src: .my.cnf.j2
+    dest: /root/.my.cnf
+    mode: '400'
+
+- name: Root password is present
+  no_log: "{{ mysql_hide_passwords | default(true) }}"
+  ansible.builtin.mysql_user:
+    name: root
+    host_all: true
+    password: "{{ mysql_root_password | mandatory }}"
+    state: present
+    login_unix_socket: "{{ login_unix_socket | default(omit) }}"
+  when: mysql_root_password_update | bool
+
+- name: Delete MySQL test database
+  ansible.builtin.mysql_db:
+    name: test
+    state: absent
+    login_unix_socket: "{{ login_unix_socket | default(omit) }}"
+
+- name: Get list of hosts for the anonymous user.
+  ansible.builtin.command: mysql -NBe "SELECT Host FROM mysql.user WHERE User = ''"
+  register: mysql_anonymous_hosts
+  changed_when: false
+  check_mode: false
+
+- name: Remove anonymous MySQL users.
+  ansible.builtin.mysql_user:
+    name: ""
+    host: "{{ item }}"
+    state: absent
+  with_items: "{{ mysql_anonymous_hosts.stdout_lines|default([]) }}"
+
+- name: Secures the MySQL root user for IPV6 localhost (::1)
+  no_log: "{{ mysql_hide_passwords | default(true) }}"
+  ansible.builtin.mysql_user:
+    user: root
+    password: "{{ mysql_root_password }}"
+    host: ::1
+
+- name: Secures the MySQL root user for IPV4 localhost (127.0.0.1)
+  no_log: "{{ mysql_hide_passwords | default(true) }}"
+  ansible.builtin.mysql_user:
+    user: root
+    password: "{{ mysql_root_password }}"
+    host: 127.0.0.1
+
+- name: Secures the MySQL root user for localhost domain (localhost)
+  no_log: "{{ mysql_hide_passwords | default(true) }}"
+  ansible.builtin.mysql_user:
+    user: root
+    password: "{{ mysql_root_password }}"
+    host: localhost
+
+- name: Secures the MySQL root user for server_hostname domain
+  no_log: "{{ mysql_hide_passwords | default(true) }}"
+  ansible.builtin.mysql_user:
+    user: root
+    password: "{{ mysql_root_password }}"
+    host: "{{ ansible_fqdn }}"

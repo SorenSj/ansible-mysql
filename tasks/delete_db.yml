@@ -1,1 +1,9 @@
 ---
+# Please note that running this command will permanently delete all MySQL databases. Make sure to back up any important data.
+- name: Remove MySQL databases
+  become: true
+  file:
+    name: "{{ item }}"
+    state: absent
+  with_items:
+    - {{ mysql_data_dir }}

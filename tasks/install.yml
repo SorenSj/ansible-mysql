@@ -1,40 +1,48 @@
 ---
-- name: Check installed MySQL
-  command: bash -lc "mysql --version"
-  register: mysql_exists
+- name: Add official MySQL Server package authentication key
+  apt_key:
+    data: "{{ lookup('file', 'mysql_pubkey.asc') }}"
+    state: present
+
+- name: Add the MySQL Server repository to APT sources
+  template:
+    src: mysql_server.list.j2
+    dest: /etc/apt/sources.list.d/mysql_server.list
+    mode: '0644'
+
+- name: Set MySQL Server root password
+  debconf:
+    name: mysql-community-server
+    question: mysql-community-server/root-pass
+    value: "{{ mysql_root_password }}"
+    vtype: password
   changed_when: false
-  ignore_errors: true
 
-# Install MySQL server
-- name: Install MySQL server
-  become: true
+- name: Confirm MySQL Server root password
+  debconf:
+    name: mysql-community-server
+    question: mysql-community-server/re-root-pass
+    value: "{{ mysql_root_password }}"
+    vtype: password
+  changed_when: false
+
+- name: Enable Legacy Authentication Method for MySQL Server
+  debconf:
+    name: mysql-community-server
+    question: mysql-server/default-auth-override
+    value: Use Legacy Authentication Method (Retain MySQL 5.x Compatibility)
+    vtype: select
+
+- name: Install/Update MySQL Community Server
   apt:
-    name: "{{ item }}"
-    state: present
     update_cache: true
-  with_items:
-    - mysql-server
-    - python-mysqldb
-  when: mysql_exists is failed
-
-# Install MySQL client
-- name: Install MySQL client
-  become: true
-  apt:
-    name: mysql-client
+    name: mysql-server
     state: present
-    update_cache: true
-  when: mysql_install_client is true
+  environment:
+    DEBIAN_FRONTEND: noninteractive
 
-- name: Run and enable mysqld
-  become: true
+- name: Start and enable MySQL Community Server service
   service:
-    name: mysqld
+    name: mysql
     state: started
     enabled: true
-  when:
-    - mysql_exists is failed
-
-- name: Set root password
-  command: mysqladmin -u root password "{{ mysql_root_password }}"
-  when: mysql_exists is failed

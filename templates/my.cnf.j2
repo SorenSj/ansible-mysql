@@ -1,0 +1,199 @@
+{{ ansible_managed | comment }}
+#
+# The MySQL database server configuration file.
+#
+# One can use all long options that the program supports.
+# Run program with --help to get a list of available options and with
+# --print-defaults to see which it would actually understand and use.
+#
+# For explanations see
+# http://dev.mysql.com/doc/mysql/en/server-system-variables.html
+
+# This will be passed to all mysql clients
+# It has been reported that passwords should be enclosed with ticks/quotes
+# escpecially if they contain "#" chars...
+# Remember to edit /etc/mysql/debian.cnf when changing the socket location.
+
+[client]
+#password = your_password
+port = {{ mysql_port }}
+socket = {{ mysql_socket }}
+
+# Here is entries for some specific programs
+
+# This was formally known as [safe_mysqld]. Both versions are currently parsed.
+[mysqld_safe]
+pid-file = {{ mysql_pid_file }}
+nice = 0
+
+[mysqld]
+#
+# * Basic Settings
+#
+# User is ignored when systemd is used (fedora >= 15).
+user = mysql
+port = {{ mysql_port }}
+# Instead of skip-networking the default is now to listen only on
+# localhost which is more compatible and is not less secure.
+{% if mysql_bind_address is defined %}
+bind-address = {{ mysql_bind_address }}
+{% else %}
+bind-address = 127.0.0.1
+{% endif %}
+basedir	= /usr
+datadir = {{ mysql_datadir }}
+tmpdir = /var/tmp
+lc-messages-dir	= /usr/share/mysql
+socket = {{ mysql_socket }}
+pid-file = {{ mysql_pid_file }}
+{% if mysql_skip_name_resolve %}
+skip-name-resolve
+{% endif %}
+{% if mysql_sql_mode is not none %}
+sql_mode = {{ mysql_sql_mode }}
+{% endif %}
+skip-external-locking
+collation_server = utf8_unicode_ci
+character_set_server = utf8
+init_connect = 'SET collation_connection = utf8_general_ci'
+init_connect = 'SET NAMES utf8'
+
+# Logging configuration.
+# Both location gets rotated by the cronjob.
+# Be aware that this log type is a performance killer.
+# As of 5.1 you can enable the log at runtime!
+general_log_file = {{ mysql_general_log_file }}
+general_log = {{ mysql_general_log }}
+{% if mysql_log_error == 'syslog' or mysql_log == 'syslog' %}
+syslog
+syslog-tag = {{ mysql_syslog_tag }}
+{% else %}
+{% if mysql_log %}
+log = {{ mysql_log }}
+{% endif %}
+log-error = {{ mysql_log_error }}
+{% endif %}
+
+{% if mysql_slow_query_log_enabled %}
+# Here you can see queries with especially long duration
+slow_query_log = 1
+slow_query_log_file = {{ mysql_slow_query_log_file }}
+#log_slow_queries = {{ mysql_slow_query_log_file }}
+long_query_time = {{ mysql_slow_query_time }}
+#log-queries-not-using-indexes
+{% endif %}
+
+{% if mysql_disable_log_bin and not mysql_replication_master %}
+# Disable binlog to save disk space
+disable-log-bin
+{% endif %}
+
+{% if mysql_replication_master %}
+# Replication configuration
+server-id = {{ mysql_server_id }}
+
+{% if mysql_replication_role == 'master' %}
+log_bin = mysql-bin
+log-bin-index = mysql-bin.index
+expire_logs_days = {{ mysql_expire_logs_days }}
+max_binlog_size = {{ mysql_max_binlog_size }}
+# Binary logging format - mixed recommended
+binlog_format = {{mysql_binlog_format}}
+
+{% for db in mysql_databases %}
+{% if db.replicate|default(1) %}
+binlog_do_db = {{ db.name }}
+{% else %}
+binlog_ignore_db = {{ db.name }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if mysql_replication_role == 'slave' %}
+read_only
+relay-log = relay-bin
+relay-log-index = relay-bin.index
+{% endif %}
+{% endif %}
+
+# Disabling symbolic-links is recommended to prevent assorted security risks
+symbolic-links = 0
+
+# http://dev.mysql.com/doc/refman/5.5/en/performance-schema.html
+;performance_schema
+
+#
+# * Fine tuning memory settings
+#
+key_buffer_size = {{ mysql_key_buffer_size }}
+max_allowed_packet = {{ mysql_max_allowed_packet }}
+table_open_cache = {{ mysql_table_open_cache }}
+sort_buffer_size = {{ mysql_sort_buffer_size }}
+read_buffer_size = {{ mysql_read_buffer_size }}
+read_rnd_buffer_size = {{ mysql_read_rnd_buffer_size }}
+thread_cache_size = {{ mysql_thread_cache_size }}
+{% if '8.0.' not in mysql_cli_version.stdout %}
+query_cache_type = {{ mysql_query_cache_type }}
+query_cache_size = {{ mysql_query_cache_size }}
+query_cache_limit = {{ mysql_query_cache_limit }}
+{% endif %}
+tmp_table_size = {{ mysql_tmp_table_size }}
+max_heap_table_size = {{ mysql_max_heap_table_size }}
+group_concat_max_len = {{ mysql_group_concat_max_len }}
+join_buffer_size = {{ mysql_join_buffer_size }}
+
+# This replaces the startup script and checks MyISAM tables if needed
+# the first time they are touched
+myisam-recover-options = BACKUP
+max_connections = {{ mysql_max_connections }}
+#table_cache = 64
+#thread_concurrency = 10
+myisam_sort_buffer_size = {{ mysql_myisam_sort_buffer_size }}
+
+# Other settings.
+wait_timeout = {{ mysql_wait_timeout }}
+lower_case_table_names = {{ mysql_lower_case_table_names }}
+event_scheduler = {{ mysql_event_scheduler_state }}
+
+#
+# * InnoDB
+#
+{% if mysql_supports_innodb_large_prefix and '8.0.' not in mysql_cli_version.stdout %}
+innodb_large_prefix = {{ mysql_innodb_large_prefix }}
+innodb_file_format = {{ mysql_innodb_file_format }}
+{% endif %}
+innodb_file_per_table = {{ mysql_innodb_file_per_table }}
+innodb_buffer_pool_size = {{ mysql_innodb_buffer_pool_size }}
+innodb_log_file_size = {{ mysql_innodb_log_file_size }}
+innodb_log_buffer_size = {{ mysql_innodb_log_buffer_size }}
+innodb_flush_log_at_trx_commit = {{ mysql_innodb_flush_log_at_trx_commit }}
+innodb_lock_wait_timeout = {{ mysql_innodb_lock_wait_timeout }}
+
+[mysqldump]
+quick
+quote-names
+max_allowed_packet = {{ mysql_mysqldump_max_allowed_packet }}
+
+#
+# * Security Features
+#
+# Read the manual, too, if you want chroot!
+# chroot = /var/lib/mysql/
+#
+# ssl-ca=/etc/mysql/cacert.pem
+# ssl-cert=/etc/mysql/server-cert.pem
+# ssl-key=/etc/mysql/server-key.pem
+
+[mysql]
+default-character-set = utf8
+#no-auto-rehash	# faster start of mysql but no tab completition
+
+[isamchk]
+key_buffer = 16M
+
+{% if mysql_config_include_files | length %}
+# * IMPORTANT: Additional settings that can override those from this file!
+#   The files must end with '.cnf', otherwise they'll be ignored.
+#
+!includedir {{ mysql_config_include_dir }}
+{% endif %}

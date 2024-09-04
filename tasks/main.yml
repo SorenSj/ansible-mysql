@@ -1,26 +1,46 @@
 ---
 # tasks file for ansible-mysql
 
-- name: Install MySQL packages
+- name: Include OS-specific variables.
+  ansible.builtin.include_vars: "{{ item }}"
+  with_first_found:
+    - files:
+        - "vars/{{ ansible_os_family }}-{{ ansible_distribution_major_version }}.yml"
+        - "vars/{{ ansible_os_family }}.yml"
+      skip: true
+
+- name: Define mysql_packages.
+  ansible.builtin.set_fact:
+    mysql_packages: "{{ __mysql_packages | list }}"
+  when: mysql_packages is not defined
+
+- name: Variable configuration.
+  ansible.builtin.include_tasks: variables.yml
+  tags:
+    - variables
+    - install
+    - configure
+
+- name: Install MySQL packages.
   ansible.builtin.include_tasks: install.yml
   tags:
     - install_mysql_server
     - install_mysql_client
     - install
 
-- name: Configure MySQL server
+- name: Configure MySQL server.
   ansible.builtin.include_tasks: configure.yml
   tags:
     - configure_mysql_server
     - configure
 
-- name: Create MySQL user(s)
+- name: Create MySQL user(s).
   ansible.builtin.include_tasks: create_user.yml
   tags:
     - create_user
     - create
 
-- name: Create MySQL database(s)
+- name: Create MySQL database(s).
   ansible.builtin.include_tasks: create_db.yml
   tags:
     - create_db
